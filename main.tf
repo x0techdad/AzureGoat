@@ -30,9 +30,36 @@ variable "location" {
   default = "eastus"
 }
 
+locals {
+  wiz_tags = {
+    WizProjectA = "true"
+    WizProjectB = "true"
+  }
+  mime_types = {
+    "css"  = "text/css"
+    "html" = "text/html"
+    "ico"  = "image/vnd.microsoft.icon"
+    "js"   = "application/javascript"
+    "json" = "application/json"
+    "map"  = "application/json"
+    "png"  = "image/png"
+    "jpg"  = "image/jpeg"
+    "svg"  = "image/svg+xml"
+    "txt"  = "text/plain"
+    "pub"  = "text/plain"
+    "pem"  = "text/plain"
+    "sh"   = "text/x-shellscript"
+  }
+  now       = timestamp()
+  sasExpiry = timeadd(local.now, "240h")
+  date_now  = formatdate("YYYY-MM-DD", local.now)
+  date_br   = formatdate("YYYY-MM-DD", local.sasExpiry)
+}
+
 resource "azurerm_resource_group" "main" {
   name     = var.resource_group
   location = var.location
+  tags     = local.wiz_tags
 }
 
 resource "azurerm_cosmosdb_account" "db" {
@@ -41,6 +68,7 @@ resource "azurerm_cosmosdb_account" "db" {
   resource_group_name = azurerm_resource_group.main.name
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
+  tags                = local.wiz_tags
 
   consistency_policy {
     consistency_level       = "BoundedStaleness"
@@ -79,6 +107,7 @@ resource "azurerm_storage_account" "storage_account" {
   account_tier                    = "Standard"
   account_replication_type        = "LRS"
   allow_nested_items_to_be_public = true
+  tags                            = local.wiz_tags
 
   blob_properties {
     cors_rule {
@@ -97,12 +126,6 @@ resource "azurerm_storage_container" "storage_container" {
   container_access_type = "blob"
 }
 
-locals {
-  now       = timestamp()
-  sasExpiry = timeadd(local.now, "240h")
-  date_now  = formatdate("YYYY-MM-DD", local.now)
-  date_br   = formatdate("YYYY-MM-DD", local.sasExpiry)
-}
 data "azurerm_storage_account_blob_container_sas" "storage_account_blob_container_sas" {
   connection_string = azurerm_storage_account.storage_account.primary_connection_string
   container_name    = azurerm_storage_container.storage_container.name
@@ -157,6 +180,7 @@ resource "azurerm_service_plan" "app_service_plan" {
   location            = "southeastasia"
   os_type             = "Linux"
   sku_name            = "P1v2"
+  tags                = local.wiz_tags
 }
 
 resource "azurerm_linux_function_app" "function_app" {
@@ -164,6 +188,7 @@ resource "azurerm_linux_function_app" "function_app" {
   resource_group_name = azurerm_resource_group.main.name
   location            = "southeastasia"
   service_plan_id     = azurerm_service_plan.app_service_plan.id
+  tags                = local.wiz_tags
   app_settings = {
     "WEBSITE_RUN_FROM_PACKAGE" = "https://${azurerm_storage_account.storage_account.name}.blob.core.windows.net/${azurerm_storage_container.storage_container.name}/${azurerm_storage_blob.storage_blob.name}${data.azurerm_storage_account_blob_container_sas.storage_account_blob_container_sas.sas}",
     "FUNCTIONS_WORKER_RUNTIME" = "python",
@@ -192,24 +217,6 @@ resource "random_id" "randomId" {
     resource_group_name = var.resource_group
   }
   byte_length = 3
-}
-
-locals {
-  mime_types = {
-    "css"  = "text/css"
-    "html" = "text/html"
-    "ico"  = "image/vnd.microsoft.icon"
-    "js"   = "application/javascript"
-    "json" = "application/json"
-    "map"  = "application/json"
-    "png"  = "image/png"
-    "jpg"  = "image/jpeg"
-    "svg"  = "image/svg+xml"
-    "txt"  = "text/plain"
-    "pub"  = "text/plain"
-    "pem"  = "text/plain"
-    "sh"   = "text/x-shellscript"
-  }
 }
 
 resource "azurerm_storage_container" "storage_container_prod" {
@@ -282,6 +289,7 @@ resource "azurerm_network_security_group" "net_sg" {
   name                = "SecGroupNet${random_id.randomId.dec}"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
+  tags                = local.wiz_tags
 
   security_rule {
     name                       = "SSH"
@@ -301,6 +309,7 @@ resource "azurerm_virtual_network" "vNet" {
   address_space       = ["10.1.0.0/16"]
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
+  tags                = local.wiz_tags
 }
 
 resource "azurerm_subnet" "vNet_subnet" {
@@ -321,12 +330,14 @@ resource "azurerm_public_ip" "VM_PublicIP" {
   idle_timeout_in_minutes = 4
   domain_name_label       = lower("developervm-${random_id.randomId.dec}")
   sku                     = "Basic"
+  tags                    = local.wiz_tags
 }
 
 resource "azurerm_network_interface" "net_int" {
   name                = "developerVMNetInt"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
+  tags                = local.wiz_tags
 
   ip_configuration {
     name                          = "ipconfig1"
@@ -354,6 +365,7 @@ resource "azurerm_linux_virtual_machine" "dev_vm" {
   admin_username      = "azureuser"
   admin_password      = "St0r95p@$sw0rd@1265463541"
   disable_password_authentication = false
+  tags                = local.wiz_tags
 
   network_interface_ids = [azurerm_network_interface.net_int.id]
 
@@ -424,8 +436,8 @@ resource "azurerm_role_assignment" "az_role_assgn_identity" {
 resource "azurerm_user_assigned_identity" "user_id" {
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
-
-  name = "user-assigned-id${random_id.randomId.dec}"
+  name                = "user-assigned-id${random_id.randomId.dec}"
+  tags                = local.wiz_tags
 }
 
 resource "azurerm_automation_account" "dev_automation_account_test" {
@@ -438,9 +450,9 @@ resource "azurerm_automation_account" "dev_automation_account_test" {
     identity_ids = [azurerm_user_assigned_identity.user_id.id]
   }
 
-  tags = {
+  tags = merge(local.wiz_tags, {
     environment = "development"
-  }
+  })
 }
 
 data "local_file" "runbook_file" {
@@ -493,6 +505,7 @@ resource "azurerm_linux_function_app" "function_app_front" {
   resource_group_name = azurerm_resource_group.main.name
   location            = "southeastasia"
   service_plan_id     = azurerm_service_plan.app_service_plan.id
+  tags                = local.wiz_tags
   app_settings = {
     "WEBSITE_RUN_FROM_PACKAGE"    = "https://${azurerm_storage_account.storage_account.name}.blob.core.windows.net/${azurerm_storage_container.storage_container.name}/${azurerm_storage_blob.storage_blob_front.name}${data.azurerm_storage_account_blob_container_sas.storage_account_blob_container_sas.sas}",
     FUNCTIONS_WORKER_RUNTIME      = "node",
