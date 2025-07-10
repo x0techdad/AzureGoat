@@ -154,8 +154,8 @@ resource "azurerm_storage_blob" "storage_blob" {
 resource "azurerm_service_plan" "app_service_plan" {
   name                = "appazgoat${random_id.randomId.dec}-app-service-plan"
   resource_group_name = azurerm_resource_group.main.name
-  location            = "southeastasia" # Try to create in different region with the resource group
-  os_type             = "Linux"         # Updated to replace the deprecated 'reserved' attribute
+  location            = "southeastasia"
+  os_type             = "Linux"
   sku_name            = "P1v2"
 }
 
@@ -174,7 +174,6 @@ resource "azurerm_linux_function_app" "function_app" {
     "CONTAINER_NAME"           = "${azurerm_storage_container.storage_container.name}"
   }
   site_config {
-    #  linux_fx_version = "Python|3.9"
     application_stack {
       python_version = "3.9"
     }
@@ -190,10 +189,8 @@ resource "azurerm_linux_function_app" "function_app" {
 
 resource "random_id" "randomId" {
   keepers = {
-    # Generate a new ID only when a new resource group is defined
     resource_group_name = var.resource_group
   }
-
   byte_length = 3
 }
 
@@ -281,8 +278,6 @@ resource "azurerm_storage_blob" "app_files_vm" {
   depends_on             = [null_resource.file_replacement_upload, azurerm_storage_container.storage_container_vm]
 }
 
-# VM Config
-#################################################################################
 resource "azurerm_network_security_group" "net_sg" {
   name                = "SecGroupNet${random_id.randomId.dec}"
   location            = azurerm_resource_group.main.location
@@ -328,12 +323,6 @@ resource "azurerm_public_ip" "VM_PublicIP" {
   sku                     = "Basic"
 }
 
-data "azurerm_public_ip" "vm_ip" {
-  name                = azurerm_public_ip.VM_PublicIP.name
-  resource_group_name = azurerm_resource_group.main.name
-  depends_on          = [azurerm_virtual_machine.dev-vm]
-}
-
 resource "azurerm_network_interface" "net_int" {
   name                = "developerVMNetInt"
   location            = azurerm_resource_group.main.location
@@ -357,39 +346,34 @@ resource "azurerm_network_interface_security_group_association" "example" {
   network_security_group_id = azurerm_network_security_group.net_sg.id
 }
 
-resource "azurerm_virtual_machine" "dev-vm" {
-  name                  = "developerVM${random_id.randomId.dec}"
-  location              = azurerm_resource_group.main.location
-  resource_group_name   = azurerm_resource_group.main.name
+resource "azurerm_linux_virtual_machine" "dev_vm" {
+  name                = "developerVM${random_id.randomId.dec}"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  size                = "Standard_B1s"
+  admin_username      = "azureuser"
+  admin_password      = "St0r95p@$sw0rd@1265463541"
+  disable_password_authentication = false
+
   network_interface_ids = [azurerm_network_interface.net_int.id]
 
-  vm_size = "Standard_B1s"
+  os_disk {
+    name                 = "developerVMDisk"
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
 
-  delete_os_disk_on_termination = true
-  delete_data_disks_on_termination = true
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-focal"
+    sku       = "20_04-lts"
+    version   = "latest"
+  }
 
   identity {
     type = "SystemAssigned"
   }
-  storage_image_reference {
-    publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "18.04-LTS"
-    version   = "latest"
-  }
-  storage_os_disk {
-    name              = "developerVMDisk"
-    create_option     = "FromImage"
-    managed_disk_type = "Standard_LRS"
-  }
-  os_profile {
-    computer_name  = "developerVM"
-    admin_username = "azureuser"
-    admin_password = "St0r95p@$sw0rd@1265463541"
-  }
-  os_profile_linux_config {
-    disable_password_authentication = false
-  }
+
   depends_on = [
     azurerm_network_interface.net_int
   ]
@@ -397,7 +381,7 @@ resource "azurerm_virtual_machine" "dev-vm" {
 
 resource "azurerm_virtual_machine_extension" "test" {
   name                 = "vm-extension"
-  virtual_machine_id   = azurerm_virtual_machine.dev-vm.id
+  virtual_machine_id   = azurerm_linux_virtual_machine.dev_vm.id
   publisher            = "Microsoft.Azure.Extensions"
   type                 = "CustomScript"
   type_handler_version = "2.0"
@@ -412,18 +396,20 @@ SETTINGS
   depends_on = [null_resource.file_replacement_upload, azurerm_storage_blob.app_files_prod]
 }
 
-#Role Assignment
-
-data "azurerm_subscription" "primary" {
+data "azurerm_public_ip" "vm_ip" {
+  name                = azurerm_public_ip.VM_PublicIP.name
+  resource_group_name = azurerm_resource_group.main.name
+  depends_on          = [azurerm_linux_virtual_machine.dev_vm]
 }
 
-data "azurerm_client_config" "example" {
-}
+data "azurerm_subscription" "primary" {}
+
+data "azurerm_client_config" "example" {}
 
 resource "azurerm_role_assignment" "az_role_assgn_vm" {
   scope                = "${data.azurerm_subscription.primary.id}/resourceGroups/${azurerm_resource_group.main.name}"
   role_definition_name = "Contributor"
-  principal_id         = azurerm_virtual_machine.dev-vm.identity.0.principal_id
+  principal_id         = azurerm_linux_virtual_machine.dev_vm.identity[0].principal_id
 }
 
 resource "azurerm_role_assignment" "az_role_assgn_identity" {
@@ -486,8 +472,6 @@ resource "azurerm_automation_runbook" "dev_automation_runbook" {
   content                 = data.local_file.runbook_file.content
 }
 
-###########################frontend########################################
-
 data "archive_file" "file_function_app_front" {
   type        = "zip"
   source_dir  = "modules/module-1/resources/azure_function/react"
@@ -516,7 +500,6 @@ resource "azurerm_linux_function_app" "function_app_front" {
   }
   functions_extension_version = "~4"
   site_config {
-    #  linux_fx_version = "Node|18lts"
     application_stack {
       node_version = "16"
     }
@@ -531,7 +514,7 @@ resource "null_resource" "file_replacement_vm_ip" {
     command     = "sed -i 's/VM_IP_ADDR/${data.azurerm_public_ip.vm_ip.ip_address}/g' modules/module-1/resources/storage_account/shared/files/.ssh/config.txt"
     interpreter = ["/bin/bash", "-c"]
   }
-  depends_on = [azurerm_virtual_machine.dev-vm, data.azurerm_public_ip.vm_ip]
+  depends_on = [azurerm_linux_virtual_machine.dev_vm, data.azurerm_public_ip.vm_ip]
 }
 
 resource "azurerm_storage_blob" "config_update_prod" {
