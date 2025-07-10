@@ -122,7 +122,7 @@ resource "azurerm_storage_account" "storage_account" {
 
 resource "azurerm_storage_container" "storage_container" {
   name                  = "appazgoat${random_id.randomId.dec}-storage-container"
-  storage_account_name  = azurerm_storage_account.storage_account.name
+  storage_account_id  = azurerm_storage_account.storage_account.id
   container_access_type = "blob"
 }
 
@@ -221,19 +221,19 @@ resource "random_id" "randomId" {
 
 resource "azurerm_storage_container" "storage_container_prod" {
   name                  = "prod-appazgoat${random_id.randomId.dec}-storage-container"
-  storage_account_name  = azurerm_storage_account.storage_account.name
+  storage_account_id  = azurerm_storage_account.storage_account.id
   container_access_type = "blob"
 }
 
 resource "azurerm_storage_container" "storage_container_dev" {
   name                  = "dev-appazgoat${random_id.randomId.dec}-storage-container"
-  storage_account_name  = azurerm_storage_account.storage_account.name
+  storage_account_id  = azurerm_storage_account.storage_account.id
   container_access_type = "container"
 }
 
 resource "azurerm_storage_container" "storage_container_vm" {
   name                  = "vm-appazgoat${random_id.randomId.dec}-storage-container"
-  storage_account_name  = azurerm_storage_account.storage_account.name
+  storage_account_id  = azurerm_storage_account.storage_account.id
   container_access_type = "container"
 }
 
