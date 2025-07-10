@@ -177,7 +177,7 @@ resource "azurerm_storage_blob" "storage_blob" {
 resource "azurerm_service_plan" "app_service_plan" {
   name                = "appazgoat${random_id.randomId.dec}-app-service-plan"
   resource_group_name = azurerm_resource_group.main.name
-  location            = "southeastasia"
+  location            = "eastus"
   os_type             = "Linux"
   sku_name            = "P1v2"
   tags                = local.wiz_tags
@@ -186,7 +186,7 @@ resource "azurerm_service_plan" "app_service_plan" {
 resource "azurerm_linux_function_app" "function_app" {
   name                = "appazgoat${random_id.randomId.dec}-function"
   resource_group_name = azurerm_resource_group.main.name
-  location            = "southeastasia"
+  location            = "eastus"
   service_plan_id     = azurerm_service_plan.app_service_plan.id
   tags                = local.wiz_tags
   app_settings = {
@@ -442,7 +442,7 @@ resource "azurerm_user_assigned_identity" "user_id" {
 
 resource "azurerm_automation_account" "dev_automation_account_test" {
   name                = "dev-automation-account-appazgoat${random_id.randomId.dec}"
-  location            = "southeastasia"
+  location            = "eastus"
   resource_group_name = azurerm_resource_group.main.name
   sku_name            = "Basic"
   identity {
@@ -474,7 +474,7 @@ EOF
 
 resource "azurerm_automation_runbook" "dev_automation_runbook" {
   name                    = "Get-AzureVM"
-  location                = "southeastasia"
+  location                = "eastus"
   resource_group_name     = azurerm_resource_group.main.name
   automation_account_name = azurerm_automation_account.dev_automation_account_test.name
   log_verbose             = "true"
@@ -503,7 +503,7 @@ resource "azurerm_storage_blob" "storage_blob_front" {
 resource "azurerm_linux_function_app" "function_app_front" {
   name                = "appazgoat${random_id.randomId.dec}-function-app"
   resource_group_name = azurerm_resource_group.main.name
-  location            = "southeastasia"
+  location            = "eastus"
   service_plan_id     = azurerm_service_plan.app_service_plan.id
   tags                = local.wiz_tags
   app_settings = {
