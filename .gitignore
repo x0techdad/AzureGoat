@@ -1,2 +1,31 @@
-.terraform.lock.hcl
+# Local .terraform directories
 .terraform/
+
+# Terraform state files
+terraform.tfstate
+terraform.tfstate.backup
+
+# Crash log files
+crash.log
+
+# Exclude override files as they are usually local
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Sensitive variable files (if any)
+secret.tfvars
+
+# Terraform plan output
+*.tfplan
+
+# Lock file (optional, but often ignored in teams)
+.terraform.lock.hcl
+
+# Local Python/venv or other environment folders (if used)
+azure-goat-environment/
+venv/
+.env/
